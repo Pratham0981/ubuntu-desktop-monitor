@@ -4,10 +4,10 @@
 
 **Blocked by:** 01: Sampler: CPU + RAM snapshot
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Window opens with CPU bar, RAM bar, numbers, sparkline
-- [ ] Updates every 1 s without visible lag
-- [ ] Dark, semi-transparent, compact
-- [ ] Widget's own CPU/RAM overhead is low
-- [ ] No network listener
+- [x] Window opens with CPU bar, RAM bar, numbers, sparkline
+- [x] Updates every 1 s without visible lag
+- [x] Dark, semi-transparent, compact
+- [x] Widget's own CPU/RAM overhead is low
+- [x] No network listener
