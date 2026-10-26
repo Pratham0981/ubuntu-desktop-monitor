@@ -8,6 +8,7 @@ new CPU sample is due.
 
 from __future__ import annotations
 
+import os
 import time
 from collections import deque
 from dataclasses import dataclass
@@ -35,6 +36,11 @@ class Snapshot:
     disk: DiskStats
     cpu_temp: float | None
     processes: tuple[ProcessInfo, ...]
+    core_percents: tuple[float, ...] = ()
+    net_down: float = 0.0
+    net_up: float = 0.0
+    load_avg: tuple[float, float, float] | None = None
+    uptime: float | None = None
 
 
 class _PsutilCpuReader:
@@ -53,6 +59,42 @@ class _PsutilCpuReader:
             self._primed = True
             return psutil.cpu_percent(interval=0.1)
         return psutil.cpu_percent(interval=None)
+
+
+class _PsutilCoreReader:
+    """Per-core load; the first reading blocks briefly, like the CPU reader."""
+
+    def __init__(self) -> None:
+        self._primed = False
+
+    def __call__(self) -> tuple[float, ...]:
+        if not self._primed:
+            self._primed = True
+            return tuple(psutil.cpu_percent(interval=0.1, percpu=True))
+        return tuple(psutil.cpu_percent(interval=None, percpu=True))
+
+
+def _psutil_net_reader() -> tuple[int, int]:
+    """Total bytes received and sent, ignoring the loopback interface."""
+    received = sent = 0
+    for name, counters in psutil.net_io_counters(pernic=True).items():
+        if name == "lo":
+            continue
+        received += counters.bytes_recv
+        sent += counters.bytes_sent
+    return received, sent
+
+
+def _system_reader() -> tuple[tuple[float, float, float] | None, float | None]:
+    try:
+        load = os.getloadavg()
+    except OSError:
+        load = None
+    try:
+        uptime = max(0.0, time.time() - psutil.boot_time())
+    except (OSError, AttributeError):
+        uptime = None
+    return load, uptime
 
 
 def _psutil_memory_reader() -> tuple[int, int]:
@@ -75,6 +117,9 @@ class Sampler:
         read_disk: Callable[[], DiskStats] | None = None,
         read_temp: Callable[[], float | None] | None = None,
         read_processes: Callable[[], tuple[ProcessInfo, ...]] | None = None,
+        read_cores: Callable[[], tuple[float, ...]] | None = None,
+        read_net: Callable[[], tuple[int, int]] | None = None,
+        read_system: Callable[[], tuple] | None = None,
     ) -> None:
         if interval <= 0:
             raise ValueError("interval must be positive")
@@ -86,6 +131,13 @@ class Sampler:
         self._read_disk = read_disk or (lambda: _read_system_disk())
         self._read_temp = read_temp or (lambda: _read_system_temp())
         self._read_processes = read_processes or (lambda: _read_system_processes())
+        self._read_cores = read_cores or _PsutilCoreReader()
+        self._read_net = read_net or _psutil_net_reader
+        self._read_system = read_system or _system_reader
+        self._cores: tuple[float, ...] = ()
+        self._net_last: tuple[float, int, int] | None = None
+        self._net_down = 0.0
+        self._net_up = 0.0
         self._history: deque[float] = deque(
             maxlen=max(1, round(history_seconds / interval))
         )
@@ -100,6 +152,16 @@ class Sampler:
         if self._last_sampled_at is None or now - self._last_sampled_at >= self._interval:
             self._cpu_percent = min(100.0, max(0.0, float(self._read_cpu())))
             self._history.append(self._cpu_percent)
+            self._cores = tuple(
+                min(100.0, max(0.0, float(value))) for value in self._read_cores()
+            )
+            received, sent = self._read_net()
+            if self._net_last is not None:
+                elapsed = now - self._net_last[0]
+                if elapsed > 0:
+                    self._net_down = max(0.0, (received - self._net_last[1]) / elapsed)
+                    self._net_up = max(0.0, (sent - self._net_last[2]) / elapsed)
+            self._net_last = (now, received, sent)
             self._last_sampled_at = now
 
         if self._disk is None or now - self._disk_sampled_at >= self._disk_interval:
@@ -107,6 +169,7 @@ class Sampler:
             self._disk_sampled_at = now
 
         ram_used, ram_total = self._read_memory()
+        load_avg, uptime = self._read_system()
         return Snapshot(
             cpu_percent=self._cpu_percent,
             ram_used=ram_used,
@@ -115,4 +178,9 @@ class Sampler:
             disk=self._disk,
             cpu_temp=self._read_temp(),
             processes=self._read_processes(),
+            core_percents=self._cores,
+            net_down=self._net_down,
+            net_up=self._net_up,
+            load_avg=load_avg,
+            uptime=uptime,
         )

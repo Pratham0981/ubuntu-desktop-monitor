@@ -105,11 +105,14 @@ def apply_desktop_placement(window: Gtk.Window) -> bool:
     return below
 
 
-def place_top_left(window: Gtk.Window, margin: int = CORNER_MARGIN) -> None:
+def place_top_left(
+    window: Gtk.Window, margin: int = CORNER_MARGIN, move: bool = True
+) -> None:
     """Fallback: a corner panel that stays above normal windows."""
     window.set_keep_above(True)
     window.set_type_hint(Gdk.WindowTypeHint.UTILITY)
-    _move_top_left(window, margin)
+    if move:
+        _move_top_left(window, margin)
 
 
 def _move_top_left(window: Gtk.Window, margin: int) -> None:

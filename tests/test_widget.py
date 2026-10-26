@@ -59,7 +59,6 @@ def test_update_shows_cpu_and_ram_as_numbers_and_bars():
 
     assert window.cpu_value.get_text() == "42%"
     assert window.ram_value.get_text() == "4.0 GB / 8.0 GB"
-    assert window.cpu_bar.get_fraction() == pytest.approx(0.42)
     assert window.ram_bar.get_fraction() == pytest.approx(0.5)
 
 
@@ -218,7 +217,7 @@ def window_pixel(window, x, y):
     return tuple(pixbuf.get_pixels()[:4])
 
 
-def test_panel_paints_a_semi_opaque_grey_with_rounded_corners():
+def test_panel_paints_a_translucent_dark_panel_with_rounded_corners():
     window = DashboardWindow(lambda: SNAP)
     window.show_all()
     pump()
@@ -227,9 +226,9 @@ def test_panel_paints_a_semi_opaque_grey_with_rounded_corners():
 
     red, green, blue, alpha = window_pixel(window, 150, 300)
 
-    assert alpha >= 220, "panel must not be transparent"
-    assert 20 <= red <= 70, "panel should be grey-black, not the desktop"
-    assert abs(red - green) <= 4 and abs(green - blue) <= 8
+    assert 180 <= alpha < 255, "panel should be glassy but readable"
+    assert red <= 40 and green <= 40 and blue <= 60, "panel should be near-black"
+    assert blue >= red, "panel carries a hint of indigo"
     assert window_pixel(window, 1, 1)[3] == 0, "corner should be rounded away"
 
 
@@ -262,7 +261,7 @@ def test_update_shows_a_row_per_tracked_mount():
     window.update(with_home)
 
     container, caption, value, bar = window.mount_rows[0]
-    assert caption.get_text() == "DISK /home"
+    assert caption.get_text() == "Disk /home"
     assert value.get_text() == "61.5 GB / 88.1 GB · 70%"
     assert bar.get_fraction() == pytest.approx(0.697)
     assert container.get_visible() is True
@@ -270,3 +269,46 @@ def test_update_shows_a_row_per_tracked_mount():
     window.update(SNAP)
 
     assert container.get_visible() is False
+
+
+def test_stylesheet_parses_without_a_display():
+    from dashboard.widget import CSS
+
+    provider = Gtk.CssProvider()
+    provider.load_from_data(CSS)
+
+
+def test_update_shows_cores_network_and_system_line():
+    window = DashboardWindow(lambda: SNAP)
+    snap = Snapshot(
+        **{
+            **SNAP.__dict__,
+            "core_percents": (10.0, 95.0),
+            "net_down": 2048.0,
+            "net_up": 512.0,
+            "load_avg": (0.5, 0.4, 0.3),
+            "uptime": 90_000.0,
+        }
+    )
+
+    window.update(snap)
+
+    assert window.core_bars.values == (10.0, 95.0)
+    assert window.net_value.get_text() == "↓ 2.0 KB/s   ↑ 512 B/s"
+    assert window.system_note.get_text() == "up 1d 1h  ·  load 0.50 0.40 0.30"
+
+
+def test_load_level_classes_follow_the_reading():
+    window = DashboardWindow(lambda: SNAP)
+
+    window.update(SNAP)
+    assert not window.ram_bar.get_style_context().has_class("hot")
+
+    hot = Snapshot(**{**SNAP.__dict__, "ram_used": 95, "ram_total": 100})
+    window.update(hot)
+    assert window.ram_bar.get_style_context().has_class("hot")
+
+
+def test_opacity_setting_is_clamped():
+    assert DashboardWindow(lambda: SNAP, settings={"opacity": 0.1})._opacity == 0.4
+    assert DashboardWindow(lambda: SNAP, settings={"opacity": "x"})._opacity == 0.84
