@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import math
+
 import gi
 
 gi.require_version("Gtk", "3.0")
@@ -15,17 +17,17 @@ from .sampler import Snapshot
 
 INTERVAL_MS = 1000
 
+# Painted by the window itself: app-paintable windows get no theme background.
+PANEL_COLOR = (0.157, 0.157, 0.169, 0.93)
+PANEL_BORDER = (1.0, 1.0, 1.0, 0.10)
+PANEL_RADIUS = 8.0
+
 CSS = b"""
-window.dashboard {
-    background-color: rgba(32, 32, 35, 0.90);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 8px;
-}
 window.dashboard label {
     color: #e9eaec;
 }
 window.dashboard label.caption {
-    color: #9a9da3;
+    color: #b3b6bb;
     font-size: 10px;
     font-weight: 700;
     letter-spacing: 1px;
@@ -38,7 +40,7 @@ window.dashboard label.value {
 window.dashboard progressbar.trough {
     min-height: 6px;
     border-radius: 3px;
-    background-color: rgba(255, 255, 255, 0.10);
+    background-color: rgba(255, 255, 255, 0.14);
     box-shadow: none;
     border: none;
 }
@@ -58,21 +60,21 @@ window.dashboard progressbar.disk progress {
     background-color: #ffb020;
 }
 window.dashboard label.note {
-    color: #9a9da3;
+    color: #a3a6ab;
     font-size: 10px;
 }
 window.dashboard label.value.disk {
     font-size: 11px;
 }
 window.dashboard label.process {
-    color: #d6d8dc;
+    color: #dcdee2;
     font-size: 10px;
 }
 window.dashboard label.process.stat {
-    color: #8f9298;
+    color: #a3a6ab;
 }
 window.dashboard separator {
-    background-color: rgba(255, 255, 255, 0.09);
+    background-color: rgba(255, 255, 255, 0.10);
     min-height: 1px;
     margin-top: 2px;
     margin-bottom: 2px;
@@ -183,7 +185,23 @@ class DashboardWindow(Gtk.Window):
         self.get_style_context().add_class("dashboard")
 
         self._build_ui()
+        self.connect("draw", self._on_draw)
         self.connect("destroy", self._on_destroy)
+
+    # -- painting --------------------------------------------------------
+    def _on_draw(self, _widget, cr):
+        width = self.get_allocated_width()
+        height = self.get_allocated_height()
+        if width <= 0 or height <= 0:
+            return False
+
+        _rounded_rectangle(cr, 0.5, 0.5, width - 1, height - 1, PANEL_RADIUS)
+        cr.set_source_rgba(*PANEL_COLOR)
+        cr.fill_preserve()
+        cr.set_line_width(1.0)
+        cr.set_source_rgba(*PANEL_BORDER)
+        cr.stroke()
+        return False
 
     # -- construction ----------------------------------------------------
     def _build_ui(self) -> None:
@@ -291,6 +309,15 @@ class DashboardWindow(Gtk.Window):
 
     def _on_destroy(self, *_args) -> None:
         self.stop()
+
+
+def _rounded_rectangle(cr, x, y, width, height, radius) -> None:
+    cr.new_sub_path()
+    cr.arc(x + width - radius, y + radius, radius, -math.pi / 2, 0)
+    cr.arc(x + width - radius, y + height - radius, radius, 0, math.pi / 2)
+    cr.arc(x + radius, y + height - radius, radius, math.pi / 2, math.pi)
+    cr.arc(x + radius, y + radius, radius, math.pi, 3 * math.pi / 2)
+    cr.close_path()
 
 
 def _row_header(caption: str) -> tuple[Gtk.Box, Gtk.Label]:

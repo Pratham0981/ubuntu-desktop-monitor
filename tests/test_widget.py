@@ -17,7 +17,7 @@ pytestmark = pytest.mark.skipif(
 
 gi = pytest.importorskip("gi")
 gi.require_version("Gtk", "3.0")
-from gi.repository import GLib, Gtk  # noqa: E402
+from gi.repository import Gdk, GLib, Gtk  # noqa: E402
 
 from dashboard.disk import DiskStats  # noqa: E402
 from dashboard.procs import ProcessInfo  # noqa: E402
@@ -211,3 +211,23 @@ def test_prepare_positions_the_window_with_its_real_width_before_allocation():
     pump()
 
     assert window.get_position() == (24, 56)
+
+
+def window_pixel(window, x, y):
+    pixbuf = Gdk.pixbuf_get_from_window(window.get_window(), x, y, 1, 1)
+    return tuple(pixbuf.get_pixels()[:4])
+
+
+def test_panel_paints_a_semi_opaque_grey_with_rounded_corners():
+    window = DashboardWindow(lambda: SNAP)
+    window.show_all()
+    pump()
+    window.update(SNAP)
+    pump()
+
+    red, green, blue, alpha = window_pixel(window, 150, 300)
+
+    assert alpha >= 220, "panel must not be transparent"
+    assert 20 <= red <= 70, "panel should be grey-black, not the desktop"
+    assert abs(red - green) <= 4 and abs(green - blue) <= 8
+    assert window_pixel(window, 1, 1)[3] == 0, "corner should be rounded away"
