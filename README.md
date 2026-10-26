@@ -66,15 +66,16 @@ rm -f ~/.config/autostart/dashboard-widget.desktop
 rm -rf ~/.local/share/dashboard-widget
 ```
 
-The widget stops appearing at the next login (or immediately, after
-`killall dashboard-widget` or closing the window's process).
+It stops appearing at the next login. To stop a running copy now, end its
+process (`pkill -f 'python3 -m dashboard'`) or log out.
 
 ## How placement works
 
 The widget runs as an XWayland client, asks for the `DESKTOP` window type, and
-sends the window manager an EWMH request to keep it below normal windows. If
-that is unavailable it falls back to an always-on-top corner panel. Details,
-including the ordering traps, are in [docs/placement.md](docs/placement.md).
+sends the window manager an EWMH request to keep it below normal windows.If that is unavailable it falls back to an always-on-top corner panel. Run with
+`--on-top` to force that panel if the under-windows placement does not look
+right on your session. Details, including the ordering traps, are in
+[docs/placement.md](docs/placement.md).
 
 ## Layout
 

@@ -35,7 +35,7 @@ def read_cpu_temp(
 ) -> float | None:
     """Return the CPU temperature in Celsius, or None when unavailable."""
     try:
-        hwmon = sensors()
+        hwmon = sensors() or {}
     except (OSError, AttributeError):
         hwmon = {}
     from_hwmon = _from_hwmon(hwmon)
