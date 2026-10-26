@@ -4,9 +4,9 @@
 
 **Blocked by:** 02: Widget window, live CPU/RAM
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] CPU temp displayed when sensor exists
-- [ ] "n/a" shown when no sensor, no exception
-- [ ] Top processes list updates with the 1 s refresh
-- [ ] Snapshot test: missing temp sensor returns none, not an error
+- [x] CPU temp displayed when sensor exists
+- [x] "n/a" shown when no sensor, no exception
+- [x] Top processes list updates with the 1 s refresh
+- [x] Snapshot test: missing temp sensor returns none, not an error
