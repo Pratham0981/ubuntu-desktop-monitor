@@ -1,4 +1,4 @@
-# System Dashboard
+# Ubuntu Desktop Monitor
 
 A compact desktop widget for Ubuntu/GNOME showing CPU load and five minutes of
 history, RAM, root and whole-disk usage, CPU temperature, and the busiest
