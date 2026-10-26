@@ -6,6 +6,7 @@ desktop session.
 """
 
 import os
+import subprocess
 
 import pytest
 
@@ -147,8 +148,6 @@ def test_update_shows_na_when_the_sensor_is_missing():
 
 
 # -- placement on XWayland -------------------------------------------------
-
-import subprocess  # noqa: E402
 
 
 def pump():

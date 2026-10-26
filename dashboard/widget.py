@@ -10,10 +10,10 @@ gi.require_version("Gdk", "3.0")
 from gi.repository import Gdk, GLib, Gtk, Pango
 
 from .format import format_bytes, format_pair, format_percent, format_temp
+from .procs import TOP_LIMIT
 from .sampler import Snapshot
 
 INTERVAL_MS = 1000
-PROCESS_ROWS = 4
 
 CSS = b"""
 window.dashboard {
@@ -168,7 +168,6 @@ class DashboardWindow(Gtk.Window):
         self._provider = snapshot_provider
         self._interval_ms = interval_ms
         self._timer_id: int = 0
-        self._snapshot: Snapshot | None = None
 
         _load_css()
         self.set_title("System Dashboard")
@@ -211,6 +210,7 @@ class DashboardWindow(Gtk.Window):
         root.pack_start(Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL), False, False, 0)
 
         disk_header, self.disk_value = _row_header("DISK /")
+        self.disk_value.get_style_context().add_class("disk")
         root.pack_start(disk_header, False, False, 0)
         self.disk_bar = _bar("disk")
         root.pack_start(self.disk_bar, False, False, 0)
@@ -233,7 +233,11 @@ class DashboardWindow(Gtk.Window):
         top_header.pack_end(legend, False, False, 0)
         root.pack_start(top_header, False, False, 0)
 
-        self.process_rows = [_process_row(root) for _ in range(PROCESS_ROWS)]
+        self.process_rows = []
+        for _ in range(TOP_LIMIT):
+            row = _process_row()
+            root.pack_start(row[0], False, False, 0)
+            self.process_rows.append(row)
 
     # -- data ------------------------------------------------------------
     def refresh(self) -> None:
@@ -242,7 +246,6 @@ class DashboardWindow(Gtk.Window):
 
     def update(self, snapshot: Snapshot) -> None:
         """Repaint every reading from a plain snapshot."""
-        self._snapshot = snapshot
         self.cpu_value.set_text(format_percent(snapshot.cpu_percent))
         self.cpu_bar.set_fraction(_fraction(snapshot.cpu_percent, 100.0))
         self.ram_value.set_text(format_pair(snapshot.ram_used, snapshot.ram_total))
@@ -254,7 +257,6 @@ class DashboardWindow(Gtk.Window):
             f"{format_pair(disk.root_used, disk.root_total)} · "
             f"{format_percent(disk.root_percent)}"
         )
-        self.disk_value.get_style_context().add_class("disk")
         self.disk_bar.set_fraction(_fraction(disk.root_percent, 100.0))
         self.ssd_note.set_text(
             f"SSD {format_bytes(disk.disk_total)} · {format_bytes(disk.disk_free)} free"
@@ -302,7 +304,7 @@ def _row_header(caption: str) -> tuple[Gtk.Box, Gtk.Label]:
     return row, value
 
 
-def _process_row(parent: Gtk.Box):
+def _process_row() -> tuple[Gtk.Box, Gtk.Label, Gtk.Label, Gtk.Label]:
     line = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
     line.hide()
     name = Gtk.Label(label="", xalign=0.0)
@@ -317,7 +319,6 @@ def _process_row(parent: Gtk.Box):
     line.pack_start(name, True, True, 0)
     line.pack_end(memory, False, False, 0)
     line.pack_end(cpu, False, False, 0)
-    parent.pack_start(line, False, False, 0)
     return line, name, cpu, memory
 
 

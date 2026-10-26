@@ -29,14 +29,23 @@ from .sampler import Sampler  # noqa: E402
 from .widget import DashboardWindow  # noqa: E402
 
 
-def _place_window(window, _event) -> bool:
-    if not placement.apply_desktop_placement(window):
+def wants_on_top(argv: list[str]) -> bool:
+    """True when the user asked for the always-on-top corner panel."""
+    return "--on-top" in argv
+
+
+def _place_window(window, *, on_top: bool) -> bool:
+    if on_top:
+        placement.place_top_right(window)
+    elif not placement.apply_desktop_placement(window):
         placement.place_top_right(window)
     return False  # let other handlers see the event
 
 
 def main(argv: list[str] | None = None) -> int:
     argv = list(sys.argv if argv is None else argv)
+    on_top = wants_on_top(argv)
+    argv = [arg for arg in argv if arg != "--on-top"]
     Gtk.init(argv)
     sampler = Sampler()
     # Warm up before the window exists so the first disk scan and CPU window
@@ -48,8 +57,9 @@ def main(argv: list[str] | None = None) -> int:
     # Desktop layer under normal windows, with an always-on-top corner panel
     # as the fallback for compositors that ignore the XWayland hints.  The
     # state request has to wait until the window manager has mapped the window.
-    window.connect("map-event", _place_window)
-    placement.prepare_desktop_placement(window)
+    window.connect("map-event", lambda widget, _event: _place_window(widget, on_top=on_top))
+    if not on_top:
+        placement.prepare_desktop_placement(window)
     window.show_all()
 
     window.start()

@@ -1,7 +1,5 @@
 """Behaviour of the Sampler seam: one call in, one plain Snapshot out."""
 
-import pytest
-
 from dashboard.disk import DiskStats
 from dashboard.procs import ProcessInfo
 from dashboard.sampler import Sampler, Snapshot
