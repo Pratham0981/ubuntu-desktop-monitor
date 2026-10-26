@@ -112,7 +112,11 @@ def place_top_right(window: Gtk.Window, margin: int = CORNER_MARGIN) -> None:
 
 def _move_top_right(window: Gtk.Window, margin: int) -> None:
     screen = window.get_screen()
-    width = window.get_allocated_width() or window.get_default_size()[0]
+    # Before the window is allocated, get_allocated_width() reports 1, which
+    # would push the window almost entirely off the right edge.
+    width = window.get_default_size()[0]
+    if width <= 0:
+        width = window.get_allocated_width()
     window.move(max(0, screen.get_width() - width - margin), margin)
 
 
