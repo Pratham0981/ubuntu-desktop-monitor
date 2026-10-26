@@ -1,11 +1,13 @@
 """Disk readings: root filesystem plus the whole physical disk it lives on."""
 
+import json
 import shutil
+import subprocess
 
 import psutil
 import pytest
 
-from dashboard.disk import DiskStats, parse_lsblk, read_disk
+from dashboard.disk import DiskStats, MountUsage, parse_lsblk, read_disk
 
 PAYLOAD = {
     "blockdevices": [
@@ -104,3 +106,54 @@ def test_reading_the_machine_reports_the_root_filesystem():
     assert stats.root_percent == pytest.approx(real.used / real.total * 100, abs=0.1)
     assert stats.disk_total >= stats.root_total
     assert 0 <= stats.disk_free <= stats.disk_total
+
+
+def test_tracked_mounts_are_reported_with_their_own_usage():
+    completed = subprocess.CompletedProcess(
+        [], 0, stdout=json.dumps(PAYLOAD), stderr=""
+    )
+
+    stats = read_disk(
+        "/",
+        tracked_mounts=("/home",),
+        run=lambda *args, **kwargs: completed,
+        usage=fake_usage,
+    )
+
+    assert stats.mounts == (
+        MountUsage(
+            mountpoint="/home",
+            used=30_000_000_000,
+            total=94_637_993_984,
+            percent=pytest.approx(31.7, abs=0.1),
+        ),
+    )
+
+
+def test_a_tracked_mount_that_is_not_mounted_is_skipped():
+    completed = subprocess.CompletedProcess(
+        [], 0, stdout=json.dumps(PAYLOAD), stderr=""
+    )
+
+    def only_root(mountpoint):
+        if mountpoint != "/":
+            raise FileNotFoundError(mountpoint)
+        return fake_usage(mountpoint)
+
+    stats = read_disk(
+        "/",
+        tracked_mounts=("/home", "/mnt/models"),
+        run=lambda *args, **kwargs: completed,
+        usage=only_root,
+    )
+
+    assert stats.mounts == ()
+
+
+def test_real_machine_tracks_home():
+    stats = read_disk("/")
+
+    real = psutil.disk_usage("/home")
+    home = next(m for m in stats.mounts if m.mountpoint == "/home")
+    assert home.total == real.total
+    assert home.used == real.used

@@ -10,10 +10,14 @@ from __future__ import annotations
 
 import json
 import subprocess
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any, Callable, Iterator
 
 import psutil
+
+# Filesystems shown alongside the root row.  ``/home`` lives on its own
+# partition (nvme0n1p4 here).
+TRACKED_MOUNTS = ("/home",)
 
 LSBLK_COMMAND = (
     "lsblk",
@@ -25,19 +29,31 @@ LSBLK_COMMAND = (
 
 
 @dataclass(frozen=True)
+class MountUsage:
+    """Usage for one tracked filesystem."""
+
+    mountpoint: str
+    used: int
+    total: int
+    percent: float
+
+
+@dataclass(frozen=True)
 class DiskStats:
-    """Root filesystem figures plus whole-disk totals."""
+    """Root filesystem figures, whole-disk totals and tracked mounts."""
 
     root_used: int
     root_total: int
     root_percent: float
     disk_total: int
     disk_free: int
+    mounts: tuple[MountUsage, ...] = ()
 
 
 def read_disk(
     root_mount: str = "/",
     *,
+    tracked_mounts: tuple[str, ...] = TRACKED_MOUNTS,
     run: Callable[..., subprocess.CompletedProcess] = subprocess.run,
     usage: Callable[[str], Any] = psutil.disk_usage,
 ) -> DiskStats:
@@ -47,9 +63,10 @@ def read_disk(
             LSBLK_COMMAND, capture_output=True, text=True, check=True, timeout=5
         )
         payload = json.loads(completed.stdout)
+        stats = parse_lsblk(payload, root_mount=root_mount, usage=usage)
     except (OSError, subprocess.SubprocessError, ValueError):
-        return _root_only(usage(root_mount))
-    return parse_lsblk(payload, root_mount=root_mount, usage=usage)
+        stats = _root_only(usage(root_mount))
+    return replace(stats, mounts=_mount_usage(tracked_mounts, usage))
 
 
 def parse_lsblk(
@@ -103,6 +120,27 @@ def _root_only(root_usage) -> DiskStats:
         disk_total=int(root_usage.total),
         disk_free=int(root_usage.free),
     )
+
+
+def _mount_usage(
+    mountpoints: tuple[str, ...], usage: Callable[[str], Any]
+) -> tuple[MountUsage, ...]:
+    rows = []
+    for mountpoint in mountpoints:
+        try:
+            stats = usage(mountpoint)
+        except OSError:
+            # Not mounted (yet); skip it rather than reporting zeroes.
+            continue
+        rows.append(
+            MountUsage(
+                mountpoint=mountpoint,
+                used=int(stats.used),
+                total=int(stats.total),
+                percent=_percent(stats.used, stats.total),
+            )
+        )
+    return tuple(rows)
 
 
 def _percent(used: float, total: float) -> float:

@@ -19,7 +19,7 @@ gi = pytest.importorskip("gi")
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gdk, GLib, Gtk  # noqa: E402
 
-from dashboard.disk import DiskStats  # noqa: E402
+from dashboard.disk import DiskStats, MountUsage  # noqa: E402
 from dashboard.procs import ProcessInfo  # noqa: E402
 from dashboard.sampler import Snapshot  # noqa: E402
 from dashboard.widget import DashboardWindow  # noqa: E402
@@ -231,3 +231,42 @@ def test_panel_paints_a_semi_opaque_grey_with_rounded_corners():
     assert 20 <= red <= 70, "panel should be grey-black, not the desktop"
     assert abs(red - green) <= 4 and abs(green - blue) <= 8
     assert window_pixel(window, 1, 1)[3] == 0, "corner should be rounded away"
+
+
+def test_update_shows_a_row_per_tracked_mount():
+    window = DashboardWindow(lambda: SNAP)
+    with_home = Snapshot(
+        cpu_percent=SNAP.cpu_percent,
+        ram_used=SNAP.ram_used,
+        ram_total=SNAP.ram_total,
+        cpu_history=SNAP.cpu_history,
+        disk=DiskStats(
+            root_used=SNAP.disk.root_used,
+            root_total=SNAP.disk.root_total,
+            root_percent=SNAP.disk.root_percent,
+            disk_total=SNAP.disk.disk_total,
+            disk_free=SNAP.disk.disk_free,
+            mounts=(
+                MountUsage(
+                    mountpoint="/home",
+                    used=66_000_000_000,
+                    total=94_637_993_984,
+                    percent=69.7,
+                ),
+            ),
+        ),
+        cpu_temp=SNAP.cpu_temp,
+        processes=SNAP.processes,
+    )
+
+    window.update(with_home)
+
+    container, caption, value, bar = window.mount_rows[0]
+    assert caption.get_text() == "DISK /home"
+    assert value.get_text() == "61.5 GB / 88.1 GB · 70%"
+    assert bar.get_fraction() == pytest.approx(0.697)
+    assert container.get_visible() is True
+
+    window.update(SNAP)
+
+    assert container.get_visible() is False

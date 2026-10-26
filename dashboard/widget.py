@@ -173,7 +173,7 @@ class DashboardWindow(Gtk.Window):
 
         _load_css()
         self.set_title("System Dashboard")
-        self.set_default_size(300, 366)
+        self.set_default_size(300, 400)
         self.set_resizable(False)
         self.set_decorated(False)
         self.set_app_paintable(True)
@@ -233,6 +233,10 @@ class DashboardWindow(Gtk.Window):
         self.disk_bar = _bar("disk")
         root.pack_start(self.disk_bar, False, False, 0)
 
+        self.mount_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        root.pack_start(self.mount_box, False, False, 0)
+        self.mount_rows = []
+
         self.ssd_note = Gtk.Label(label="", xalign=0.0)
         self.ssd_note.get_style_context().add_class("note")
         root.pack_start(self.ssd_note, False, False, 0)
@@ -276,6 +280,7 @@ class DashboardWindow(Gtk.Window):
             f"{format_percent(disk.root_percent)}"
         )
         self.disk_bar.set_fraction(_fraction(disk.root_percent, 100.0))
+        self._update_mounts(disk.mounts)
         self.ssd_note.set_text(
             f"SSD {format_bytes(disk.disk_total)} · {format_bytes(disk.disk_free)} free"
         )
@@ -290,6 +295,23 @@ class DashboardWindow(Gtk.Window):
             line.show_all()
         for line, _name, _cpu, _memory in self.process_rows[len(snapshot.processes):]:
             line.hide()
+
+    def _update_mounts(self, mounts) -> None:
+        for index, mount in enumerate(mounts):
+            if index == len(self.mount_rows):
+                icon_row = _mount_row()
+                self.mount_box.pack_start(icon_row[0], False, False, 0)
+                self.mount_rows.append(icon_row)
+            container, caption, value, bar = self.mount_rows[index]
+            caption.set_text(f"DISK {mount.mountpoint}")
+            value.set_text(
+                f"{format_pair(mount.used, mount.total)} · "
+                f"{format_percent(mount.percent)}"
+            )
+            bar.set_fraction(_fraction(mount.percent, 100.0))
+            container.show_all()
+        for container, _caption, _value, _bar in self.mount_rows[len(mounts):]:
+            container.hide()
 
     # -- refresh timer ---------------------------------------------------
     def start(self) -> None:
@@ -329,6 +351,23 @@ def _row_header(caption: str) -> tuple[Gtk.Box, Gtk.Label]:
     row.pack_start(name, False, False, 0)
     row.pack_end(value, False, False, 0)
     return row, value
+
+
+def _mount_row() -> tuple[Gtk.Box, Gtk.Label, Gtk.Label, Gtk.ProgressBar]:
+    container = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+    container.hide()
+    header = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+    caption = Gtk.Label(label="", xalign=0.0)
+    caption.get_style_context().add_class("caption")
+    value = Gtk.Label(label="--", xalign=1.0)
+    value.get_style_context().add_class("value")
+    value.get_style_context().add_class("disk")
+    header.pack_start(caption, False, False, 0)
+    header.pack_end(value, False, False, 0)
+    bar = _bar("disk")
+    container.pack_start(header, False, False, 0)
+    container.pack_start(bar, False, False, 0)
+    return container, caption, value, bar
 
 
 def _process_row() -> tuple[Gtk.Box, Gtk.Label, Gtk.Label, Gtk.Label]:
