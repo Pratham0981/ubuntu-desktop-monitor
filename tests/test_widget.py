@@ -1,7 +1,8 @@
 """Behaviour of the compact widget window, exercised on a real GTK display.
 
-Run the suite under `xvfb-run -a python3 -m pytest` to avoid windows on the
-live session; the tests skip themselves when no display is available.
+Run the suite under `xvfb-run -a env DASHBOARD_GUI_TESTS=1 python3 -m pytest`;
+the tests skip themselves otherwise so they never open windows on a live
+desktop session.
 """
 
 import os
@@ -9,12 +10,13 @@ import os
 import pytest
 
 pytestmark = pytest.mark.skipif(
-    not os.environ.get("DISPLAY"), reason="needs an X display (use xvfb-run)"
+    not (os.environ.get("DISPLAY") and os.environ.get("DASHBOARD_GUI_TESTS")),
+    reason="GUI tests are opt-in: xvfb-run -a env DASHBOARD_GUI_TESTS=1 python3 -m pytest",
 )
 
 gi = pytest.importorskip("gi")
 gi.require_version("Gtk", "3.0")
-from gi.repository import GLib  # noqa: E402
+from gi.repository import GLib, Gtk  # noqa: E402
 
 from dashboard.disk import DiskStats  # noqa: E402
 from dashboard.procs import ProcessInfo  # noqa: E402
@@ -142,3 +144,62 @@ def test_update_shows_na_when_the_sensor_is_missing():
 
     assert window.temp_value.get_text() == "n/a"
     assert all(not row[0].get_visible() for row in window.process_rows)
+
+
+# -- placement on XWayland -------------------------------------------------
+
+import subprocess  # noqa: E402
+
+
+def pump():
+    while Gtk.events_pending():
+        Gtk.main_iteration_do(False)
+
+
+def xprop(window, prop):
+    xid = window.get_window().get_xid()
+    result = subprocess.run(
+        ["xprop", "-id", hex(xid), prop], capture_output=True, text=True
+    )
+    return result.stdout
+
+
+def test_desktop_placement_sets_desktop_type_and_below_state():
+    from dashboard import placement
+
+    window = DashboardWindow(lambda: SNAP)
+    placement.prepare_desktop_placement(window)
+    window.show_all()
+    pump()
+
+    assert placement.apply_desktop_placement(window) is True
+    pump()
+
+    assert "_NET_WM_WINDOW_TYPE_DESKTOP" in xprop(window, "_NET_WM_WINDOW_TYPE")
+    # The below request goes to the window manager as an EWMH client message;
+    # Xvfb has no WM, so only the client-side hints are observable here.
+    assert "_NET_WM_STATE_SKIP_TASKBAR" in xprop(window, "_NET_WM_STATE")
+    assert "accepts input or input focus: False" in xprop(window, "WM_HINTS")
+
+
+def test_placement_reports_failure_without_an_x11_window():
+    from dashboard import placement
+
+    window = DashboardWindow(lambda: SNAP)
+
+    assert placement.apply_desktop_placement(window) is False
+
+
+def test_fallback_keeps_the_window_above_and_in_the_corner():
+    from dashboard import placement
+
+    window = DashboardWindow(lambda: SNAP)
+    window.show_all()
+    pump()
+
+    placement.place_top_right(window, margin=24)
+    pump()
+
+    expected_x = window.get_screen().get_width() - window.get_allocated_width() - 24
+    x, _y = window.get_position()
+    assert x == expected_x

@@ -24,8 +24,15 @@ gi.require_version("Gtk", "3.0")
 
 from gi.repository import Gtk  # noqa: E402
 
+from . import placement  # noqa: E402
 from .sampler import Sampler  # noqa: E402
 from .widget import DashboardWindow  # noqa: E402
+
+
+def _place_window(window, _event) -> bool:
+    if not placement.apply_desktop_placement(window):
+        placement.place_top_right(window)
+    return False  # let other handlers see the event
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -37,7 +44,14 @@ def main(argv: list[str] | None = None) -> int:
     sampler.snapshot()
     window = DashboardWindow(sampler.snapshot)
     window.connect("destroy", Gtk.main_quit)
+
+    # Desktop layer under normal windows, with an always-on-top corner panel
+    # as the fallback for compositors that ignore the XWayland hints.  The
+    # state request has to wait until the window manager has mapped the window.
+    window.connect("map-event", _place_window)
+    placement.prepare_desktop_placement(window)
     window.show_all()
+
     window.start()
     Gtk.main()
     return 0
