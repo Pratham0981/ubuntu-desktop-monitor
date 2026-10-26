@@ -3,6 +3,7 @@
 import pytest
 
 from dashboard.disk import DiskStats
+from dashboard.procs import ProcessInfo
 from dashboard.sampler import Sampler, Snapshot
 
 DISK = DiskStats(
@@ -32,6 +33,8 @@ def make_sampler(clock, cpu_values, ram=(3_000, 8_000)):
         read_cpu=lambda: next(values),
         read_memory=lambda: ram,
         read_disk=lambda: DISK,
+        read_temp=lambda: 50.0,
+        read_processes=lambda: (),
     )
 
 
@@ -41,6 +44,8 @@ def test_snapshot_reports_cpu_and_ram():
         read_cpu=lambda: 42.5,
         read_memory=lambda: (3_000, 8_000),
         read_disk=lambda: DISK,
+        read_temp=lambda: 50.0,
+        read_processes=lambda: (),
     )
 
     snap = sampler.snapshot()
@@ -131,3 +136,33 @@ def test_disk_is_resampled_every_thirty_seconds_while_cpu_stays_every_second():
     assert first.disk is disk
     assert later.disk is disk
     assert len(disk_reads) == 2
+
+
+def test_snapshot_carries_temperature_and_processes():
+    proc = ProcessInfo(pid=7, name="busy", cpu_percent=90.0, memory_percent=2.0)
+    sampler = Sampler(
+        clock=FakeClock(),
+        read_cpu=lambda: 10.0,
+        read_memory=lambda: (1, 2),
+        read_disk=lambda: DISK,
+        read_temp=lambda: 61.5,
+        read_processes=lambda: (proc,),
+    )
+
+    snap = sampler.snapshot()
+
+    assert snap.cpu_temp == 61.5
+    assert snap.processes == (proc,)
+
+
+def test_missing_temperature_sensor_is_reported_as_none():
+    sampler = Sampler(
+        clock=FakeClock(),
+        read_cpu=lambda: 10.0,
+        read_memory=lambda: (1, 2),
+        read_disk=lambda: DISK,
+        read_temp=lambda: None,
+        read_processes=lambda: (),
+    )
+
+    assert sampler.snapshot().cpu_temp is None

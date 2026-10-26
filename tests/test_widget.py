@@ -17,6 +17,7 @@ gi.require_version("Gtk", "3.0")
 from gi.repository import GLib  # noqa: E402
 
 from dashboard.disk import DiskStats  # noqa: E402
+from dashboard.procs import ProcessInfo  # noqa: E402
 from dashboard.sampler import Snapshot  # noqa: E402
 from dashboard.widget import DashboardWindow  # noqa: E402
 
@@ -34,6 +35,11 @@ SNAP = Snapshot(
     ram_total=8_589_934_592,
     cpu_history=(5.0, 12.0, 42.0),
     disk=DISK,
+    cpu_temp=53.4,
+    processes=(
+        ProcessInfo(pid=11, name="firefox", cpu_percent=12.3, memory_percent=7.5),
+        ProcessInfo(pid=12, name="python3", cpu_percent=8.0, memory_percent=1.2),
+    ),
 )
 
 
@@ -60,7 +66,7 @@ def test_window_is_compact_and_painted_by_css():
     width, height = window.get_default_size()
 
     assert 200 <= width <= 360
-    assert 120 <= height <= 320
+    assert 120 <= height <= 420
     assert window.get_app_paintable() is True
 
 
@@ -104,3 +110,35 @@ def test_update_shows_the_root_filesystem_and_whole_disk():
     assert window.disk_value.get_text() == "46.1 GB / 95.6 GB · 48%"
     assert window.disk_bar.get_fraction() == pytest.approx(0.482)
     assert window.ssd_note.get_text() == "SSD 188.5 GB · 101.5 GB free"
+
+
+def test_update_shows_temperature_and_top_processes():
+    window = DashboardWindow(lambda: SNAP)
+
+    window.update(SNAP)
+
+    assert window.temp_value.get_text() == "53°C"
+    rows = window.process_rows
+    assert rows[0][1].get_text() == "firefox"
+    assert rows[0][2].get_text() == "12%"
+    assert rows[0][3].get_text() == "8%"
+    assert rows[0][0].get_visible() is True
+    assert rows[2][0].get_visible() is False
+
+
+def test_update_shows_na_when_the_sensor_is_missing():
+    window = DashboardWindow(lambda: SNAP)
+    without_temp = Snapshot(
+        cpu_percent=SNAP.cpu_percent,
+        ram_used=SNAP.ram_used,
+        ram_total=SNAP.ram_total,
+        cpu_history=SNAP.cpu_history,
+        disk=SNAP.disk,
+        cpu_temp=None,
+        processes=(),
+    )
+
+    window.update(without_temp)
+
+    assert window.temp_value.get_text() == "n/a"
+    assert all(not row[0].get_visible() for row in window.process_rows)

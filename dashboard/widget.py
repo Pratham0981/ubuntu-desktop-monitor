@@ -7,12 +7,13 @@ import gi
 gi.require_version("Gtk", "3.0")
 gi.require_version("Gdk", "3.0")
 
-from gi.repository import Gdk, GLib, Gtk
+from gi.repository import Gdk, GLib, Gtk, Pango
 
-from .format import format_bytes, format_pair, format_percent
+from .format import format_bytes, format_pair, format_percent, format_temp
 from .sampler import Snapshot
 
 INTERVAL_MS = 1000
+PROCESS_ROWS = 4
 
 CSS = b"""
 window.dashboard {
@@ -63,6 +64,13 @@ window.dashboard label.note {
 window.dashboard label.value.disk {
     font-size: 11px;
 }
+window.dashboard label.process {
+    color: #d7dadd;
+    font-size: 10px;
+}
+window.dashboard label.process.stat {
+    color: #9aa0a6;
+}
 window.dashboard separator {
     background-color: rgba(255, 255, 255, 0.08);
     min-height: 1px;
@@ -99,7 +107,7 @@ class Sparkline(Gtk.DrawingArea):
 
     def __init__(self) -> None:
         super().__init__()
-        self.set_size_request(-1, 52)
+        self.set_size_request(-1, 46)
         self._history: tuple[float, ...] = ()
         self.connect("draw", self._on_draw)
 
@@ -164,7 +172,7 @@ class DashboardWindow(Gtk.Window):
 
         _load_css()
         self.set_title("System Dashboard")
-        self.set_default_size(300, 254)
+        self.set_default_size(300, 366)
         self.set_resizable(False)
         self.set_decorated(False)
         self.set_app_paintable(True)
@@ -180,9 +188,9 @@ class DashboardWindow(Gtk.Window):
 
     # -- construction ----------------------------------------------------
     def _build_ui(self) -> None:
-        root = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
-        root.set_margin_top(12)
-        root.set_margin_bottom(12)
+        root = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        root.set_margin_top(10)
+        root.set_margin_bottom(10)
         root.set_margin_start(14)
         root.set_margin_end(14)
         self.add(root)
@@ -211,6 +219,22 @@ class DashboardWindow(Gtk.Window):
         self.ssd_note.get_style_context().add_class("note")
         root.pack_start(self.ssd_note, False, False, 0)
 
+        root.pack_start(Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL), False, False, 0)
+
+        temp_header, self.temp_value = _row_header("TEMP")
+        root.pack_start(temp_header, False, False, 0)
+
+        top_header = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        caption = Gtk.Label(label="TOP", xalign=0.0)
+        caption.get_style_context().add_class("caption")
+        legend = Gtk.Label(label="CPU / RAM", xalign=1.0)
+        legend.get_style_context().add_class("note")
+        top_header.pack_start(caption, True, True, 0)
+        top_header.pack_end(legend, False, False, 0)
+        root.pack_start(top_header, False, False, 0)
+
+        self.process_rows = [_process_row(root) for _ in range(PROCESS_ROWS)]
+
     # -- data ------------------------------------------------------------
     def refresh(self) -> None:
         """Poll the sampler once and repaint the window."""
@@ -235,6 +259,17 @@ class DashboardWindow(Gtk.Window):
         self.ssd_note.set_text(
             f"SSD {format_bytes(disk.disk_total)} · {format_bytes(disk.disk_free)} free"
         )
+
+        self.temp_value.set_text(format_temp(snapshot.cpu_temp))
+        for (line, name, cpu, memory), process in zip(
+            self.process_rows, snapshot.processes
+        ):
+            name.set_text(process.name)
+            cpu.set_text(format_percent(process.cpu_percent))
+            memory.set_text(format_percent(process.memory_percent))
+            line.show_all()
+        for line, _name, _cpu, _memory in self.process_rows[len(snapshot.processes):]:
+            line.hide()
 
     # -- refresh timer ---------------------------------------------------
     def start(self) -> None:
@@ -265,6 +300,25 @@ def _row_header(caption: str) -> tuple[Gtk.Box, Gtk.Label]:
     row.pack_start(name, False, False, 0)
     row.pack_end(value, False, False, 0)
     return row, value
+
+
+def _process_row(parent: Gtk.Box):
+    line = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+    line.hide()
+    name = Gtk.Label(label="", xalign=0.0)
+    name.set_ellipsize(Pango.EllipsizeMode.END)
+    name.get_style_context().add_class("process")
+    cpu = Gtk.Label(label="", xalign=1.0)
+    cpu.get_style_context().add_class("process stat")
+    memory = Gtk.Label(label="", xalign=1.0)
+    memory.get_style_context().add_class("process stat")
+    cpu.set_width_chars(5)
+    memory.set_width_chars(5)
+    line.pack_start(name, True, True, 0)
+    line.pack_end(memory, False, False, 0)
+    line.pack_end(cpu, False, False, 0)
+    parent.pack_start(line, False, False, 0)
+    return line, name, cpu, memory
 
 
 def _bar(style_class: str) -> Gtk.ProgressBar:

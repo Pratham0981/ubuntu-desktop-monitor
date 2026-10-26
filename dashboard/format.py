@@ -26,3 +26,10 @@ def format_pair(used: float, total: float) -> str:
 def format_percent(value: float) -> str:
     """Render a percentage as a whole number, e.g. ``42%``."""
     return f"{value:.0f}%"
+
+
+def format_temp(celsius: float | None) -> str:
+    """Render a temperature, or ``n/a`` when the sensor is missing."""
+    if celsius is None:
+        return "n/a"
+    return f"{celsius:.0f}°C"

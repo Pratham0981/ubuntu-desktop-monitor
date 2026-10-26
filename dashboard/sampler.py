@@ -16,6 +16,8 @@ from typing import Callable
 import psutil
 
 from .disk import DiskStats, read_disk as _read_system_disk
+from .procs import ProcessInfo, read_top_processes as _read_system_processes
+from .thermal import read_cpu_temp as _read_system_temp
 
 HISTORY_SECONDS = 300
 SAMPLE_INTERVAL = 1.0
@@ -31,13 +33,26 @@ class Snapshot:
     ram_total: int
     cpu_history: tuple[float, ...]
     disk: DiskStats
+    cpu_temp: float | None
+    processes: tuple[ProcessInfo, ...]
 
 
-def _psutil_cpu_reader() -> Callable[[], float]:
-    # psutil reports 0.0 for the first non-blocking reading after import, so
-    # take that throw-away reading now and hand back useful ones afterwards.
-    psutil.cpu_percent(interval=None)
-    return lambda: psutil.cpu_percent(interval=None)
+class _PsutilCpuReader:
+    """psutil CPU reader with a meaningful first reading.
+
+    psutil reports 0.0 on the first non-blocking call, and a non-blocking call
+    straight after priming measures a near-zero window (often 100%).  So the
+    first reading blocks for a tenth of a second, once, at startup.
+    """
+
+    def __init__(self) -> None:
+        self._primed = False
+
+    def __call__(self) -> float:
+        if not self._primed:
+            self._primed = True
+            return psutil.cpu_percent(interval=0.1)
+        return psutil.cpu_percent(interval=None)
 
 
 def _psutil_memory_reader() -> tuple[int, int]:
@@ -58,15 +73,19 @@ class Sampler:
         read_cpu: Callable[[], float] | None = None,
         read_memory: Callable[[], tuple[int, int]] | None = None,
         read_disk: Callable[[], DiskStats] | None = None,
+        read_temp: Callable[[], float | None] | None = None,
+        read_processes: Callable[[], tuple[ProcessInfo, ...]] | None = None,
     ) -> None:
         if interval <= 0:
             raise ValueError("interval must be positive")
         self._interval = interval
         self._disk_interval = disk_interval
         self._clock = clock
-        self._read_cpu = read_cpu or _psutil_cpu_reader()
+        self._read_cpu = read_cpu or _PsutilCpuReader()
         self._read_memory = read_memory or _psutil_memory_reader
         self._read_disk = read_disk or (lambda: _read_system_disk())
+        self._read_temp = read_temp or (lambda: _read_system_temp())
+        self._read_processes = read_processes or (lambda: _read_system_processes())
         self._history: deque[float] = deque(
             maxlen=max(1, round(history_seconds / interval))
         )
@@ -94,4 +113,6 @@ class Sampler:
             ram_total=ram_total,
             cpu_history=tuple(self._history),
             disk=self._disk,
+            cpu_temp=self._read_temp(),
+            processes=self._read_processes(),
         )

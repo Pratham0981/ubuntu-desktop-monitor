@@ -1,6 +1,6 @@
 """Formatting helpers shared by every row of the widget."""
 
-from dashboard.format import format_bytes, format_pair, format_percent
+from dashboard.format import format_bytes, format_pair, format_percent, format_temp
 
 
 def test_bytes_use_binary_units_with_one_decimal():
@@ -17,3 +17,8 @@ def test_pairs_read_used_over_total():
 def test_percent_is_rounded_to_a_whole_number():
     assert format_percent(42.4) == "42%"
     assert format_percent(99.6) == "100%"
+
+
+def test_temperature_reads_in_celsius_or_not_available():
+    assert format_temp(53.4) == "53°C"
+    assert format_temp(None) == "n/a"

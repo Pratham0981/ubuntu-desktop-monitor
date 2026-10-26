@@ -32,6 +32,9 @@ def main(argv: list[str] | None = None) -> int:
     argv = list(sys.argv if argv is None else argv)
     Gtk.init(argv)
     sampler = Sampler()
+    # Warm up before the window exists so the first disk scan and CPU window
+    # are not paid for while the window is painting.
+    sampler.snapshot()
     window = DashboardWindow(sampler.snapshot)
     window.connect("destroy", Gtk.main_quit)
     window.show_all()
