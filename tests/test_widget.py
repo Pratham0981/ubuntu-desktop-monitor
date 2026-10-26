@@ -16,14 +16,24 @@ gi = pytest.importorskip("gi")
 gi.require_version("Gtk", "3.0")
 from gi.repository import GLib  # noqa: E402
 
+from dashboard.disk import DiskStats  # noqa: E402
 from dashboard.sampler import Snapshot  # noqa: E402
 from dashboard.widget import DashboardWindow  # noqa: E402
+
+DISK = DiskStats(
+    root_used=49_505_730_560,
+    root_total=102_683_975_680,
+    root_percent=48.2,
+    disk_total=202_369_925_120,
+    disk_free=109_033_067_008,
+)
 
 SNAP = Snapshot(
     cpu_percent=42.0,
     ram_used=4_294_967_296,
     ram_total=8_589_934_592,
     cpu_history=(5.0, 12.0, 42.0),
+    disk=DISK,
 )
 
 
@@ -84,3 +94,13 @@ def test_stop_halts_the_refresh_timer():
     run_loop(150)
 
     assert len(calls) == seen
+
+
+def test_update_shows_the_root_filesystem_and_whole_disk():
+    window = DashboardWindow(lambda: SNAP)
+
+    window.update(SNAP)
+
+    assert window.disk_value.get_text() == "46.1 GB / 95.6 GB · 48%"
+    assert window.disk_bar.get_fraction() == pytest.approx(0.482)
+    assert window.ssd_note.get_text() == "SSD 188.5 GB · 101.5 GB free"
