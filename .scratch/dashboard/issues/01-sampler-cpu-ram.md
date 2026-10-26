@@ -4,10 +4,10 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Snapshot call returns CPU %, RAM used, RAM total, CPU history list
-- [ ] CPU % within 0-100, RAM used <= total
-- [ ] History capped at ~5 min, oldest dropped first
-- [ ] Tests assert external snapshot behavior only
-- [ ] Runs on Ubuntu with psutil, no extra deps
+- [x] Snapshot call returns CPU %, RAM used, RAM total, CPU history list
+- [x] CPU % within 0-100, RAM used <= total
+- [x] History capped at ~5 min, oldest dropped first
+- [x] Tests assert external snapshot behavior only
+- [x] Runs on Ubuntu with psutil, no extra deps
