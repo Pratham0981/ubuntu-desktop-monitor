@@ -17,21 +17,21 @@ INTERVAL_MS = 1000
 
 CSS = b"""
 window.dashboard {
-    background-color: rgba(16, 18, 22, 0.82);
-    border: 1px solid rgba(255, 255, 255, 0.07);
-    border-radius: 14px;
+    background-color: rgba(32, 32, 35, 0.90);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
 }
 window.dashboard label {
-    color: #e8eaed;
+    color: #e9eaec;
 }
 window.dashboard label.caption {
-    color: #9aa0a6;
+    color: #9a9da3;
     font-size: 10px;
     font-weight: 700;
     letter-spacing: 1px;
 }
 window.dashboard label.value {
-    color: #f1f3f4;
+    color: #fbfbfc;
     font-size: 13px;
     font-weight: 600;
 }
@@ -49,30 +49,30 @@ window.dashboard progressbar progress {
     box-shadow: none;
 }
 window.dashboard progressbar.cpu progress {
-    background-color: #4aa8ff;
+    background-color: #4f9cff;
 }
 window.dashboard progressbar.ram progress {
-    background-color: #7bd88f;
+    background-color: #32d583;
 }
 window.dashboard progressbar.disk progress {
-    background-color: #f5c451;
+    background-color: #ffb020;
 }
 window.dashboard label.note {
-    color: #9aa0a6;
+    color: #9a9da3;
     font-size: 10px;
 }
 window.dashboard label.value.disk {
     font-size: 11px;
 }
 window.dashboard label.process {
-    color: #d7dadd;
+    color: #d6d8dc;
     font-size: 10px;
 }
 window.dashboard label.process.stat {
-    color: #9aa0a6;
+    color: #8f9298;
 }
 window.dashboard separator {
-    background-color: rgba(255, 255, 255, 0.08);
+    background-color: rgba(255, 255, 255, 0.09);
     min-height: 1px;
     margin-top: 2px;
     margin-bottom: 2px;

@@ -8,7 +8,7 @@ request to add the ``_NET_WM_STATE_BELOW`` state after the window maps.
 GDK rewrites ``_NET_WM_STATE`` from its own hints at map time, which is why the
 below request is sent afterwards as a client message rather than written
 straight into the property.  When no X11 window manager is reachable, callers
-fall back to :func:`place_top_right`, a small always-on-top corner panel.
+fall back to :func:`place_top_left`, a small always-on-top corner panel.
 """
 
 from __future__ import annotations
@@ -37,6 +37,8 @@ NET_WM_STATE_ADD = 1
 SOURCE_APPLICATION = 1
 
 CORNER_MARGIN = 24
+# GNOME's top bar is drawn over the desktop layer, so start below it.
+TOP_BAR_CLEARANCE = 32
 
 
 class _ClientMessageData(ctypes.Union):
@@ -81,14 +83,14 @@ def prepare_desktop_placement(
     window.set_skip_taskbar_hint(True)
     window.set_skip_pager_hint(True)
     window.set_keep_above(False)
-    _move_top_right(window, margin)
+    _move_top_left(window, margin)
 
 
 def apply_desktop_placement(window: Gtk.Window) -> bool:
     """Ask the window manager to keep the window below normal windows.
 
     Call after showing.  Returns False when there is no X11 window to ask, so
-    the caller can fall back to :func:`place_top_right`.
+    the caller can fall back to :func:`place_top_left`.
     """
     gdk_window = window.get_window()
     if gdk_window is None or GdkX11 is None:
@@ -103,21 +105,15 @@ def apply_desktop_placement(window: Gtk.Window) -> bool:
     return below
 
 
-def place_top_right(window: Gtk.Window, margin: int = CORNER_MARGIN) -> None:
+def place_top_left(window: Gtk.Window, margin: int = CORNER_MARGIN) -> None:
     """Fallback: a corner panel that stays above normal windows."""
     window.set_keep_above(True)
     window.set_type_hint(Gdk.WindowTypeHint.UTILITY)
-    _move_top_right(window, margin)
+    _move_top_left(window, margin)
 
 
-def _move_top_right(window: Gtk.Window, margin: int) -> None:
-    screen = window.get_screen()
-    # Before the window is allocated, get_allocated_width() reports 1, which
-    # would push the window almost entirely off the right edge.
-    width = window.get_default_size()[0]
-    if width <= 0:
-        width = window.get_allocated_width()
-    window.move(max(0, screen.get_width() - width - margin), margin)
+def _move_top_left(window: Gtk.Window, margin: int) -> None:
+    window.move(margin, margin + TOP_BAR_CLEARANCE)
 
 
 def _change_state_atom(xid: int, atom_name: str, *, add: bool) -> bool:

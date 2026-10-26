@@ -36,9 +36,9 @@ def wants_on_top(argv: list[str]) -> bool:
 
 def _place_window(window, *, on_top: bool) -> bool:
     if on_top:
-        placement.place_top_right(window)
+        placement.place_top_left(window)
     elif not placement.apply_desktop_placement(window):
-        placement.place_top_right(window)
+        placement.place_top_left(window)
     return False  # let other handlers see the event
 
 

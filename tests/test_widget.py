@@ -196,12 +196,10 @@ def test_fallback_keeps_the_window_above_and_in_the_corner():
     window.show_all()
     pump()
 
-    placement.place_top_right(window, margin=24)
+    placement.place_top_left(window, margin=24)
     pump()
 
-    expected_x = window.get_screen().get_width() - window.get_allocated_width() - 24
-    x, _y = window.get_position()
-    assert x == expected_x
+    assert window.get_position() == (24, 56)
 
 
 def test_prepare_positions_the_window_with_its_real_width_before_allocation():
@@ -212,7 +210,4 @@ def test_prepare_positions_the_window_with_its_real_width_before_allocation():
     window.show_all()
     pump()
 
-    width = window.get_default_size()[0]
-    expected_x = window.get_screen().get_width() - width - 24
-    x, y = window.get_position()
-    assert (x, y) == (expected_x, 24)
+    assert window.get_position() == (24, 56)

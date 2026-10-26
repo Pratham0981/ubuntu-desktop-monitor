@@ -13,7 +13,7 @@ desktop layer.
 | `_NET_WM_STATE_BELOW` | EWMH client message to the root window, on `map-event` |
 | `_NET_WM_STATE_SKIP_TASKBAR`, `_NET_WM_STATE_SKIP_PAGER` | GTK skip hints |
 | `WM_HINTS.input = False`, focus-on-map off | `set_accept_focus(False)`, `set_focus_on_map(False)` |
-| Top-right corner position | `Gtk.Window.move()` before the window maps |
+| Top-left corner position | `Gtk.Window.move()` before the window maps |
 
 Two ordering details matter and are easy to regress:
 
@@ -33,7 +33,7 @@ _NET_WM_STATE(ATOM) = _NET_WM_STATE_SKIP_PAGER, _NET_WM_STATE_SKIP_TASKBAR,
                       _NET_WM_STATE_BELOW, _NET_WM_STATE_STICKY
 _NET_WM_DESKTOP(CARDINAL) = 4294967295        # all desktops
 WM_HINTS: Client accepts input or input focus: False
-geometry: 300x366 at the top-right corner, Map State: IsViewable
+geometry: 300x366 at the top-left corner, Map State: IsViewable
 ```
 
 Mapping an unfocused desktop-layer window makes Mutter add
@@ -50,7 +50,7 @@ fallback is a small always-on-top corner panel:
 
 ```python
 from dashboard import placement
-placement.place_top_right(window)
+placement.place_top_left(window)
 ```
 
 `apply_desktop_placement()` returns `False` when there is no X11 window to ask
