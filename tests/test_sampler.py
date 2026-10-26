@@ -2,7 +2,16 @@
 
 import pytest
 
+from dashboard.disk import DiskStats
 from dashboard.sampler import Sampler, Snapshot
+
+DISK = DiskStats(
+    root_used=40_000_000_000,
+    root_total=100_000_000_000,
+    root_percent=40.0,
+    disk_total=500_000_000_000,
+    disk_free=250_000_000_000,
+)
 
 
 class FakeClock:
@@ -22,6 +31,7 @@ def make_sampler(clock, cpu_values, ram=(3_000, 8_000)):
         clock=clock,
         read_cpu=lambda: next(values),
         read_memory=lambda: ram,
+        read_disk=lambda: DISK,
     )
 
 
@@ -30,6 +40,7 @@ def test_snapshot_reports_cpu_and_ram():
         clock=FakeClock(),
         read_cpu=lambda: 42.5,
         read_memory=lambda: (3_000, 8_000),
+        read_disk=lambda: DISK,
     )
 
     snap = sampler.snapshot()
@@ -82,10 +93,13 @@ def test_history_keeps_only_the_last_five_minutes():
 
 
 def test_cpu_percent_is_kept_within_zero_and_hundred():
-    assert Sampler(clock=FakeClock(), read_cpu=lambda: 130.0,
-                   read_memory=lambda: (1, 2)).snapshot().cpu_percent == 100.0
-    assert Sampler(clock=FakeClock(), read_cpu=lambda: -3.0,
-                   read_memory=lambda: (1, 2)).snapshot().cpu_percent == 0.0
+    def percent_for(value):
+        sampler = Sampler(clock=FakeClock(), read_cpu=lambda: value,
+                          read_memory=lambda: (1, 2), read_disk=lambda: DISK)
+        return sampler.snapshot().cpu_percent
+
+    assert percent_for(130.0) == 100.0
+    assert percent_for(-3.0) == 0.0
 
 
 def test_real_system_snapshot_is_plausible():
@@ -94,3 +108,26 @@ def test_real_system_snapshot_is_plausible():
     assert 0.0 <= snap.cpu_percent <= 100.0
     assert 0 < snap.ram_used <= snap.ram_total
     assert 1 <= len(snap.cpu_history) <= 300
+
+
+def test_disk_is_resampled_every_thirty_seconds_while_cpu_stays_every_second():
+    clock = FakeClock()
+    disk = DISK
+    disk_reads = []
+    sampler = Sampler(
+        clock=clock,
+        read_cpu=lambda: 10.0,
+        read_memory=lambda: (1, 2),
+        read_disk=lambda: (disk_reads.append(1), disk)[1],
+    )
+
+    first = sampler.snapshot()
+    clock.advance(5.0)
+    sampler.snapshot()
+    clock.advance(25.0)
+
+    later = sampler.snapshot()
+
+    assert first.disk is disk
+    assert later.disk is disk
+    assert len(disk_reads) == 2
