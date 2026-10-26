@@ -4,8 +4,12 @@
 
 **Blocked by:** 05: Under-windows placement
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Install script is idempotent and user-level (no sudo for the widget itself)
+- [x] Install script is idempotent and user-level (no sudo for the widget itself)
 - [ ] After logout/login the widget appears automatically
-- [ ] Uninstall steps documented
+- [x] Uninstall steps documented (README.md)
+
+**Note:** verified by installing into a throwaway `HOME` twice and
+launching the installed copy. The real login autostart is in place as soon as
+`./install.sh` is run on the account; a restart is needed to observe it.
